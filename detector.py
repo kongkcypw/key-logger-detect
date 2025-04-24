@@ -7,6 +7,7 @@ from scapy.layers.inet import IP
 import tkinter as tk
 from tkinter import scrolledtext
 from collections import defaultdict, deque
+import os
 
 smtp_ports = [465, 25, 587, 2525]
 ftp_ports = [20, 21]
@@ -42,6 +43,9 @@ class PacketSnifferDetector:
         self.stop_button = tk.Button(right_frame, text="Stop", command=self.stop_monitoring, state=tk.DISABLED)
         self.stop_button.pack(side=tk.RIGHT, padx=5, pady=(15, 0), ipadx=5)
 
+        self.clear_button = tk.Button(right_frame, text="Clear", command=self.clear_logs)
+        self.clear_button.pack(side=tk.RIGHT, padx=5, pady=(15, 0), ipadx=5)
+
         # === MAIN LOG AREA
         main_frame = tk.Frame(root)
         main_frame.pack(expand=True, fill='both')
@@ -71,15 +75,15 @@ class PacketSnifferDetector:
         self.suspicious_count = 0
         self.process_count = 0
 
-        # Create a frame to hold stats label and clear button
+        # Create a frame to hold stats label and export button
         stats_frame = tk.Frame(root)
         stats_frame.pack(fill='x', padx=10, pady=(5, 15))
 
         self.stats_label = tk.Label(stats_frame, text="Packets: 0 | Process: 0 | Suspicious: 0", anchor='w')
         self.stats_label.pack(side=tk.LEFT)
 
-        self.clear_button = tk.Button(stats_frame, text="Clear", command=self.clear_logs)
-        self.clear_button.pack(side=tk.RIGHT, padx=10, ipadx=5, ipady=5)
+        self.export_button = tk.Button(stats_frame, text="Export", command=self.export_logs)
+        self.export_button.pack(side=tk.RIGHT, padx=10, ipadx=5, ipady=5)
 
         self.repetition_tracker = defaultdict(lambda: deque(maxlen=100))  
         self.repeat_threshold = 3  # Minimum number of similar intervals to mark as repeated
@@ -121,6 +125,22 @@ class PacketSnifferDetector:
         self.process_count = 0
         self.suspicious_count = 0
         self.stats_label.config(text="Packets: 0 | Process: 0 | Suspicious: 0")
+
+    def export_logs(self):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"sniffer_logs_{timestamp}.txt"
+        filepath = os.path.join(os.getcwd(), filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("=== Process Logs ===\n")
+            for is_suspicious, entry in self.process_log:
+                f.write(entry + "\n")
+            f.write("\n=== Packet Logs ===\n")
+            for is_suspicious, entry in self.packet_log:
+                f.write(entry + "\n")
+            f.write("\n=== Suspicious Warnings ===\n")
+            for line in self.warning_text.get("1.0", tk.END).strip().splitlines():
+                f.write(line + "\n")
+        self.warning_logging(f"📁 Logs exported to: {filepath}")
 
     def detect_smtp_activity(self):
         global detected
