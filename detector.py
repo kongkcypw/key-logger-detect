@@ -62,8 +62,8 @@ class PacketSnifferDetector:
         warning_frame = tk.LabelFrame(root, text="Suspicious Warnings")
         warning_frame.pack(fill='x', padx=5, pady=(0, 5))
 
-        self.warning_text = scrolledtext.ScrolledText(warning_frame, height=12, font=("Consolas", 10), state='disabled')
-        self.warning_text.pack(fill='x')
+        self.warning_text = scrolledtext.ScrolledText(warning_frame, height=15, font=("Consolas", 10), state='disabled')
+        self.warning_text.pack(expand=True, fill='both')
 
         self.running = False
 
@@ -73,13 +73,13 @@ class PacketSnifferDetector:
 
         # Create a frame to hold stats label and clear button
         stats_frame = tk.Frame(root)
-        stats_frame.pack(fill='x', padx=10, pady=(0, 10))
+        stats_frame.pack(fill='x', padx=10, pady=(5, 15))
 
         self.stats_label = tk.Label(stats_frame, text="Packets: 0 | Process: 0 | Suspicious: 0", anchor='w')
         self.stats_label.pack(side=tk.LEFT)
 
         self.clear_button = tk.Button(stats_frame, text="Clear", command=self.clear_logs)
-        self.clear_button.pack(side=tk.RIGHT, padx=10, ipadx=5)
+        self.clear_button.pack(side=tk.RIGHT, padx=10, ipadx=5, ipady=5)
 
         self.repetition_tracker = defaultdict(lambda: deque(maxlen=100))  
         self.repeat_threshold = 3  # Minimum number of similar intervals to mark as repeated
@@ -172,7 +172,7 @@ class PacketSnifferDetector:
                                 detected.add(key)
                                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 entry = (
-                                    f"[{timestamp}] ⚠️ FTP connection detected:\n"
+                                    f"\n[{timestamp}] ⚠️ FTP connection detected:\n"
                                     f"   PID: {conn.pid}, Process: {proc.name()}, IP: {ip}:{port}\n"
                                     f"   CMD: {cmdline}\n\n"
                                     f"{'-'*60}\n"
@@ -207,6 +207,10 @@ class PacketSnifferDetector:
                 proto_label = "[FTP]"
             elif dst_port in http_ports:
                 proto_label = "[HTTP/HTTPS]"
+
+            # print(dst_port)
+            if dst_port in smtp_ports:
+                print("SMTP --------------------------")
 
             is_suspicious = False
             reason = ""
@@ -269,16 +273,30 @@ class PacketSnifferDetector:
                         self.warning_logging(entry)
                         self.packet_log.append((True, entry))
 
+            if packet.haslayer(Raw):
+                raw_data = packet[Raw].load
+                if b"EHLO" in raw_data or b"MAIL FROM" in raw_data or b"AUTH LOGIN" in raw_data:
+                    is_smtp = True
+                    self.suspicious_count += 1
+                    entry = (
+                        f"[{timestamp}] 📬 SMTP Command Detected in Raw Payload\n"
+                        f"From: {src_ip}:{src_port} → {dst_ip}:{dst_port}\n"
+                        f"Raw Payload Snippet: {raw_data[:100]}\n"
+                        f"{'-'*60}\n"
+                    )
+                    self.warning_logging(entry)
+                    self.packet_log.append((True, entry))
+
             self.packet_count += 1
             if is_suspicious == False:
-                entry = f"{proto_label} [{timestamp}] Normal TCP: {src_ip}:{src_port} → {dst_ip}:{dst_port}"
+                entry = f"{proto_label} [{timestamp}] Normal Packet: {src_ip}:{src_port} → {dst_ip}:{dst_port}"
                 self.packet_log.append((False, entry))
                 self.packet_logging(entry)
             
-            self.stats_label.config(text=f"📊 Packets: {self.packet_count} | Process: {self.process_count} | Suspicious: {self.suspicious_count}")
+            self.stats_label.config(text=f"Packets: {self.packet_count} | Process: {self.process_count} | Suspicious: {self.suspicious_count}")
 
     def start_sniffing(self):
-        sniff(filter="tcp", prn=self.handle_packet, store=False, stop_filter=lambda x: not self.running)
+        sniff(filter="tcp or udp", prn=self.handle_packet, store=False, stop_filter=lambda x: not self.running)
 
     def start_monitoring(self):
         if not self.running:
