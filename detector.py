@@ -141,7 +141,7 @@ class PacketSnifferDetector:
             for line in self.warning_text.get("1.0", tk.END).strip().splitlines():
                 f.write(line + "\n")
         self.warning_logging(f"📁 Logs exported to: {filepath}")
-
+    
     def detect_smtp_activity(self):
         global detected
         while self.running:
@@ -228,12 +228,7 @@ class PacketSnifferDetector:
             elif dst_port in http_ports:
                 proto_label = "[HTTP/HTTPS]"
 
-            # print(dst_port)
-            if dst_port in smtp_ports:
-                print("SMTP --------------------------")
-
             is_suspicious = False
-            reason = ""
             payload_str = ""
 
             dst_ip = packet[IP].dst if IP in packet else "unknown"
@@ -246,7 +241,7 @@ class PacketSnifferDetector:
                 # Store the timestamp as datetime object for accurate interval calculation
                 self.repetition_tracker[key].append(current_time)
                 
-                # We need at least 3 timestamps to detect a pattern
+                # At least 3 timestamps to detect a pattern
                 if len(self.repetition_tracker[key]) >= 3:
                     # Calculate time intervals between consecutive timestamps
                     intervals = []
@@ -260,7 +255,7 @@ class PacketSnifferDetector:
                             diff += 24 * 60 * 60
                         intervals.append(diff)
                     
-                    # Group similar intervals to detect patterns
+                    # Group similar intervals
                     interval_groups = defaultdict(int)
                     for interval in intervals:
                         # Round to nearest second for grouping
@@ -276,8 +271,10 @@ class PacketSnifferDetector:
                             most_common_interval = interval
                             
                     # Determine if we have a suspicious pattern
-                    # At least 3 occurrences of the same interval and interval is between 1-60 seconds
-                    if most_common_interval and max_count >= self.repeat_threshold and 50 <= most_common_interval <= 70:
+                    # At least 3 occurrences of the same interval and interval is between min_interval and max_interval seconds
+                    min_interval = 50
+                    max_interval = 70
+                    if most_common_interval and max_count >= self.repeat_threshold and min_interval <= most_common_interval <= max_interval:
                         is_suspicious = True
                         self.suspicious_count += 1
                         entry = (
@@ -292,20 +289,6 @@ class PacketSnifferDetector:
                         )
                         self.warning_logging(entry)
                         self.packet_log.append((True, entry))
-
-            if packet.haslayer(Raw):
-                raw_data = packet[Raw].load
-                if b"EHLO" in raw_data or b"MAIL FROM" in raw_data or b"AUTH LOGIN" in raw_data:
-                    is_smtp = True
-                    self.suspicious_count += 1
-                    entry = (
-                        f"[{timestamp}] 📬 SMTP Command Detected in Raw Payload\n"
-                        f"From: {src_ip}:{src_port} → {dst_ip}:{dst_port}\n"
-                        f"Raw Payload Snippet: {raw_data[:100]}\n"
-                        f"{'-'*60}\n"
-                    )
-                    self.warning_logging(entry)
-                    self.packet_log.append((True, entry))
 
             self.packet_count += 1
             if is_suspicious == False:
